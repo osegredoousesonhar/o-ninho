@@ -1,69 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import HTMLFlipBook from 'react-pageflip';
-import { getFirestore, collection, getDocs, orderBy, query, where } from "firebase/firestore"; 
+import { getFirestore, collection, getDocs, query, where } from "firebase/firestore";
 import app from '../firebaseConfig.js';
 
-import { Worker, Viewer } from '@react-pdf-viewer/core';
-import { pageNavigationPlugin } from '@react-pdf-viewer/page-navigation';
-import '@react-pdf-viewer/core/lib/styles/index.css';
-import '@react-pdf-viewer/page-navigation/lib/styles/index.css';
-
-function PdfFlipBook({ fileUrl }) {
-    const pageNavigationPluginInstance = pageNavigationPlugin();
-    const { jumpToPage } = pageNavigationPluginInstance;
-    const [numPages, setNumPages] = useState(0);
-
+const Page = React.forwardRef(({ imageUrl, number }, ref) => {
+    const pageStyle = {
+        backgroundColor: '#fff',
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        overflow: 'hidden',
+    };
     return (
-        <div style={{ position: 'relative', width: '500px', height: '700px' }}>
-            
-            <div style={{ display: 'none' }}>
-                <Worker workerUrl={`https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js`}>
-                    <Viewer 
-                        fileUrl={fileUrl}
-                        plugins={[pageNavigationPluginInstance]}
-                        onDocumentLoad={({ numPages: nextNumPages }) => setNumPages(nextNumPages)}
-                    />
-                </Worker>
-            </div>
-
-            {numPages > 0 && (
-                <HTMLFlipBook 
-                    width={500} 
-                    height={700} 
-                    onFlip={(e) => jumpToPage(e.data + 1)}
-                    flippingTime={800}
-                    maxShadowOpacity={0.5}
-                    showCover={true}
-                >
-                    {Array.from(new Array(numPages), (el, index) => (
-                        <div className="page" key={`page_${index + 1}`} style={{ backgroundColor: '#fdfaf7', border: '1px solid #c2b5a3' }}>
-                            {/* Conteúdo será sobreposto pelo Viewer */}
-                        </div>
-                    ))}
-                </HTMLFlipBook>
-            )}
-
-            <div style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                pointerEvents: 'none',
-            }}>
-                <Worker workerUrl={`https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js`}>
-                     <Viewer 
-                        fileUrl={fileUrl}
-                        plugins={[pageNavigationPluginInstance]}
-                    />
-                </Worker>
-            </div>
+        <div style={pageStyle} ref={ref}>
+            <img src={imageUrl} alt={`Página ${number}`} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
         </div>
     );
-}
+});
 
 function Book({ bookCategory }) {
-    const [items, setItems] = useState([]);
+    const [pages, setPages] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -71,46 +27,55 @@ function Book({ bookCategory }) {
             setIsLoading(false);
             return;
         }
-        const fetchItems = async () => {
+        const fetchPages = async () => {
             setIsLoading(true);
             const db = getFirestore(app);
+            
             const itemsQuery = query(
                 collection(db, "bookItems"), 
-                where("category", "==", bookCategory),
-                orderBy("createdAt")
+                where("category", "==", bookCategory)
             );
             
             const querySnapshot = await getDocs(itemsQuery);
-            const itemsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const pagesData = querySnapshot.docs.map(doc => doc.data());
             
-            setItems(itemsData);
+            pagesData.sort((a, b) => a.fileName.localeCompare(b.fileName, undefined, { numeric: true, sensitivity: 'base' }));
+            
+            const orderedUrls = pagesData.map(page => page.fileURL);
+
+            setPages(orderedUrls);
             setIsLoading(false);
         };
-        fetchItems();
+        fetchPages();
     }, [bookCategory]);
 
     if (isLoading) {
-        return <div style={{textAlign: 'center', paddingTop: '50px'}}>Carregando livro...</div>;
+        return <div style={{textAlign: 'center', paddingTop: '50px'}}>Montando o livro...</div>;
     }
 
-    if (items.length === 0) {
+    if (pages.length === 0) {
         return (
             <div style={{textAlign: 'center', paddingTop: '50px'}}>
                 <h2>{bookCategory}</h2>
-                <p>Nenhum conteúdo publicado para este livro ainda.</p>
+                <p>Nenhum conteúdo publicado ainda.</p>
             </div>
         );
     }
 
-    const bookFile = items[0]; 
-
     return (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#e0e_0e0' }}>
-            {bookFile && bookFile.fileURL.includes('.pdf') ? (
-                <PdfFlipBook fileUrl={bookFile.fileURL} />
-            ) : (
-                <p>Este item não é um PDF.</p>
-            )}
+        // ESTA É A LINHA ALTERADA
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#333333' }}>
+            <HTMLFlipBook 
+                width={450} 
+                height={636}
+                showCover={true}
+                flippingTime={800}
+                maxShadowOpacity={0.5}
+            >
+                {pages.map((pageUrl, index) => (
+                    <Page key={index} imageUrl={pageUrl} number={index + 1} />
+                ))}
+            </HTMLFlipBook>
         </div>
     );
 }
