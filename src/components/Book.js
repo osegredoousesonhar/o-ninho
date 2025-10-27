@@ -3,13 +3,11 @@ import HTMLFlipBook from 'react-pageflip';
 import { getFirestore, collection, getDocs, orderBy, query, where } from "firebase/firestore"; 
 import app from '../firebaseConfig.js';
 
-// Importamos a biblioteca que vai "ler" o PDF e seus estilos
 import { Worker, Viewer } from '@react-pdf-viewer/core';
 import { pageNavigationPlugin } from '@react-pdf-viewer/page-navigation';
 import '@react-pdf-viewer/core/lib/styles/index.css';
 import '@react-pdf-viewer/page-navigation/lib/styles/index.css';
 
-// Este componente renderiza o LIVRO com efeito de virar a página
 function PdfFlipBook({ fileUrl }) {
     const pageNavigationPluginInstance = pageNavigationPlugin();
     const { jumpToPage } = pageNavigationPluginInstance;
@@ -17,35 +15,40 @@ function PdfFlipBook({ fileUrl }) {
 
     return (
         <div style={{ position: 'relative', width: '500px', height: '700px' }}>
-            <div style={{ display: 'none' }}>
-                <Worker workerUrl={`https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js`}>
-                    <Viewer 
-                        fileUrl={fileUrl}
-                        plugins={[pageNavigationPluginInstance]}
-                        onDocumentLoad={({ numPages: nextNumPages }) => setNumPages(nextNumPages)}
-                    />
-                </Worker>
-            </div>
-
+            
+            {/* O HTMLFlipBook é a camada de baixo, responsável pelo efeito de virar */}
             {numPages > 0 && (
                 <HTMLFlipBook 
                     width={500} 
                     height={700} 
-                    onFlip={(e) => jumpToPage(e.data)}
+                    onFlip={(e) => jumpToPage(e.data + 1)} // +1 para ajustar o índice da página
+                    flippingTime={800}
+                    maxShadowOpacity={0.5}
+                    showCover={true}
                 >
+                    {/* Criamos páginas em branco apenas para dar o volume ao livro */}
                     {Array.from(new Array(numPages), (el, index) => (
                         <div className="page" key={`page_${index + 1}`} style={{ backgroundColor: '#fdfaf7', border: '1px solid #c2b5a3' }}>
-                            {/* Conteúdo será mostrado pelo Viewer flutuante */}
+                            {/* O conteúdo será sobreposto pelo Viewer */}
                         </div>
                     ))}
                 </HTMLFlipBook>
             )}
 
-            <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
+            {/* O Viewer do PDF fica por cima, mostrando o conteúdo real */}
+            <div style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                pointerEvents: 'none', // Permite que o clique "atravesse" para o livro abaixo
+            }}>
                 <Worker workerUrl={`https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js`}>
                      <Viewer 
                         fileUrl={fileUrl}
                         plugins={[pageNavigationPluginInstance]}
+                        onDocumentLoad={({ numPages: nextNumPages }) => setNumPages(nextNumPages)}
                     />
                 </Worker>
             </div>
@@ -53,7 +56,6 @@ function PdfFlipBook({ fileUrl }) {
     );
 }
 
-// Componente principal que busca os dados no Firestore
 function Book({ bookCategory }) {
     const [items, setItems] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -108,3 +110,4 @@ function Book({ bookCategory }) {
 }
 
 export default Book;
+```4.  **Salve o arquivo**.
