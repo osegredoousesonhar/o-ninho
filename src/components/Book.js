@@ -16,39 +16,45 @@ function PdfFlipBook({ fileUrl }) {
     return (
         <div style={{ position: 'relative', width: '500px', height: '700px' }}>
             
-            {/* O HTMLFlipBook é a camada de baixo, responsável pelo efeito de virar */}
+            <div style={{ display: 'none' }}>
+                <Worker workerUrl={`https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js`}>
+                    <Viewer 
+                        fileUrl={fileUrl}
+                        plugins={[pageNavigationPluginInstance]}
+                        onDocumentLoad={({ numPages: nextNumPages }) => setNumPages(nextNumPages)}
+                    />
+                </Worker>
+            </div>
+
             {numPages > 0 && (
                 <HTMLFlipBook 
                     width={500} 
                     height={700} 
-                    onFlip={(e) => jumpToPage(e.data + 1)} // +1 para ajustar o índice da página
+                    onFlip={(e) => jumpToPage(e.data + 1)}
                     flippingTime={800}
                     maxShadowOpacity={0.5}
                     showCover={true}
                 >
-                    {/* Criamos páginas em branco apenas para dar o volume ao livro */}
                     {Array.from(new Array(numPages), (el, index) => (
                         <div className="page" key={`page_${index + 1}`} style={{ backgroundColor: '#fdfaf7', border: '1px solid #c2b5a3' }}>
-                            {/* O conteúdo será sobreposto pelo Viewer */}
+                            {/* Conteúdo será sobreposto pelo Viewer */}
                         </div>
                     ))}
                 </HTMLFlipBook>
             )}
 
-            {/* O Viewer do PDF fica por cima, mostrando o conteúdo real */}
             <div style={{
                 position: 'absolute',
                 top: 0,
                 left: 0,
                 width: '100%',
                 height: '100%',
-                pointerEvents: 'none', // Permite que o clique "atravesse" para o livro abaixo
+                pointerEvents: 'none',
             }}>
                 <Worker workerUrl={`https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js`}>
                      <Viewer 
                         fileUrl={fileUrl}
                         plugins={[pageNavigationPluginInstance]}
-                        onDocumentLoad={({ numPages: nextNumPages }) => setNumPages(nextNumPages)}
                     />
                 </Worker>
             </div>
@@ -99,7 +105,7 @@ function Book({ bookCategory }) {
     const bookFile = items[0]; 
 
     return (
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#e0e0e0' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#e0e_0e0' }}>
             {bookFile && bookFile.fileURL.includes('.pdf') ? (
                 <PdfFlipBook fileUrl={bookFile.fileURL} />
             ) : (
@@ -110,4 +116,3 @@ function Book({ bookCategory }) {
 }
 
 export default Book;
-```4.  **Salve o arquivo**.
