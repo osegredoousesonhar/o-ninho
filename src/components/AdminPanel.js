@@ -1,82 +1,115 @@
 import React, { useState } from 'react';
+import { getAuth, signOut } from "firebase/auth";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { getFirestore, collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { getFirestore, collection, serverTimestamp, writeBatch, doc } from "firebase/firestore";
 import app from '../firebaseConfig.js';
 
 function AdminPanel({ onLogout }) {
-    const [files, setFiles] = useState([]); // Agora pode guardar múltiplos arquivos
+    const [topicTitle, setTopicTitle] = useState('');
+    const [files, setFiles] = useState([]);
     const [category, setCategory] = useState('Calopsitas');
     const [isUploading, setIsUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState('');
 
     const handleFileChange = (e) => {
-        if (e.target.files.length > 0) {
-            // Converte a lista de arquivos em um array para podermos usar 'map'
+        if (e.target.files.length) {
             setFiles(Array.from(e.target.files));
         }
     };
 
-    const handleSaveItems = async () => {
-        if (files.length === 0 || !category) {
-            alert('Por favor, selecione uma categoria e um ou mais arquivos de imagem.');
+    const handleSaveTopic = async () => {
+        if (!topicTitle || files.length === 0) {
+            alert('Por favor, preencha o título e selecione os arquivos.');
             return;
         }
         setIsUploading(true);
+        setUploadProgress('Iniciando...');
+        const db = getFirestore(app);
+        const storage = getStorage(app);
+        const batch = writeBatch(db);
 
-        // Usamos Promise.all para fazer o upload de todos os arquivos em paralelo
-        await Promise.all(
-            files.map(async (file) => {
-                try {
-                    const storage = getStorage(app);
-                    const storageRef = ref(storage, `book_files/${category}/${file.name}`);
-                    const uploadResult = await uploadBytes(storageRef, file);
-                    const downloadURL = await getDownloadURL(uploadResult.ref);
-                    const db = getFirestore(app);
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            setUploadProgress(`Enviando ${i + 1}/${files.length}: ${file.name}`);
+            const storagePath = `book_files/${category}/${topicTitle.replace(/\s+/g, '_')}/${file.name}`;
+            const storageRef = ref(storage, storagePath);
+            
+            try {
+                await uploadBytes(storageRef, file);
+                const downloadURL = await getDownloadURL(storageRef);
+                const docRef = doc(collection(db, "bookItems"));
+                
+                batch.set(docRef, {
+                    title: file.name.split('.')[0],
+                    fileURL: downloadURL,
+                    storagePath: storagePath,
+                    category: category,
+                    topic: topicTitle,
+                    pageOrder: i + 1,
+                    fileName: file.name,
+                    createdAt: serverTimestamp() 
+                });
 
-                    // Salvamos um documento para CADA imagem
-                    await addDoc(collection(db, "bookItems"), {
-                        title: file.name.replace(/\.[^/.]+$/, ""), // Usa o nome do arquivo (sem extensão) como título
-                        fileURL: downloadURL,
-                        fileName: file.name,
-                        category: category,
-                        createdAt: serverTimestamp()
-                    });
-                } catch (e) {
-                    console.error("Erro ao salvar o arquivo:", file.name, e);
-                    // Podemos adicionar uma lógica para notificar sobre falhas individuais
-                }
-            })
-        );
+            } catch (error) {
+                console.error("Erro ao enviar o arquivo:", error);
+                alert(`Ocorreu um erro ao enviar o arquivo ${file.name}.`);
+                setIsUploading(false);
+                setUploadProgress('');
+                return;
+            }
+        }
+        
+        try {
+            await batch.commit();
+            alert(`Tópico "${topicTitle}" salvo com sucesso!`);
+        } catch (error) {
+            console.error("Erro ao salvar no Firestore:", error);
+            alert("Erro ao salvar as referências no banco de dados.");
+        }
 
-        alert(`${files.length} páginas foram salvas com sucesso na categoria: ${category}`);
-        setIsUploading(false);
+        setTopicTitle('');
         setFiles([]);
-        document.getElementById('file-input').value = null;
+        if(document.getElementById('file-input')) {
+            document.getElementById('file-input').value = null;
+        }
+        setIsUploading(false);
+        setUploadProgress('');
     };
 
     return (
-        <div style={{ padding: '20px', fontFamily: 'Arial' }}>
-            <h2>Painel de Administração - Publicar Páginas</h2>
-            <button onClick={onLogout} style={{ float: 'right' }}>Sair</button>
-            
-            <div style={{ marginTop: '30px' }}>
-                <h3>Adicionar Páginas (Imagens) a um Livro</h3>
-                
-                <label htmlFor="category-select">Escolha o livro:</label>
-                <select id="category-select" value={category} onChange={(e) => setCategory(e.target.value)}
-                    style={{ width: '100%', padding: '10px', marginBottom: '10px', marginTop: '5px' }}>
-                    <option value="Calopsitas">Livro: Calopsitas</option>
-                    <option value="Ring Necks">Livro: Ring Necks</option>
-                    <option value="Roselas">Livro: Roselas</option>
-                </select>
-                
-                <label htmlFor="file-input">Selecione as imagens das páginas:</label>
-                <input type="file" id="file-input" onChange={handleFileChange} multiple // A palavra "multiple" é a chave aqui
-                    style={{ width: '100%', padding: '10px', marginBottom: '10px', marginTop: '5px' }} />
-                
-                <button onClick={handleSaveItems} disabled={isUploading || files.length === 0}>
-                    {isUploading ? `Enviando ${files.length} páginas...` : 'Salvar Páginas'}
-                </button>
-            </div>
+        <div className="admin-panel">
+            <header className="app-header">
+                <div className="header-logo">O NINHO - Painel de Administração</div>
+                <button onClick={onLogout} className="header-login-link">Sair</button>
+            </header>
+
+            <section className="admin-section">
+                <h3>Adicionar Tópico/Capítulo (com Múltiplas Páginas)</h3>
+                <div className="admin-form">
+                    <label htmlFor="category-select">Escolha o livro:</label>
+                    <select id="category-select" value={category} onChange={(e) => setCategory(e.target.value)}>
+                        <option value="Calopsitas">Livro: Calopsitas</option>
+                        <option value="Ring Necks">Livro: Ring Necks</option>
+                        <option value="Roselas">Livro: Roselas</option>
+                    </select>
+
+                    <label htmlFor="topic-title-input">Título do Tópico/Capítulo:</label>
+                    <input id="topic-title-input" type="text" placeholder="Ex: Capítulo 1 - Introdução" value={topicTitle} onChange={(e) => setTopicTitle(e.target.value)} />
+                    
+                    <label htmlFor="file-input">Selecione os arquivos das páginas (pode selecionar vários):</label>
+                    <input 
+                        type="file" 
+                        id="file-input" 
+                        onChange={handleFileChange} 
+                        multiple
+                    />
+
+                    <button onClick={handleSaveTopic} disabled={isUploading}>
+                        {isUploading ? 'Enviando...' : 'Salvar Tópico'}
+                    </button>
+                    {isUploading && <p>{uploadProgress}</p>}
+                </div>
+            </section>
         </div>
     );
 }
