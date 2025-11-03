@@ -1,9 +1,13 @@
+// ===================================================================
+// ARQUIVO COMPLETO E FINAL PARA: src/App.js
+// ===================================================================
+
 import React, { useState, useEffect } from 'react';
 import { getAuth, onAuthStateChanged, signOut } from "firebase/auth"; 
 import app from './firebaseConfig.js';
 import './App.css'; 
 
-import backgroundImage from './assets/background.png';
+import logoImage from './assets/logo2.png'; // Usando o logo2 como solicitado
 
 import Login from './components/Login';
 import HomePage from './components/HomePage';
@@ -14,22 +18,23 @@ import Footer from './components/Footer';
 function AppHeader({ navigate, user }) {
   return (
     <header className="app-header">
-      {/* --- AQUI ESTÁ A NOVA ESTRUTURA DO LOGO --- */}
-      <div className="header-logo">
-        <span className="logo-brand-name">O NINHO</span>
-        <span className="logo-tagline">A Bíblia das Aves Exóticas</span>
+      <div className="header-left">
+        <div className="header-title">O Ninho</div>
       </div>
-      
-      {!user && (
-        <div onClick={() => navigate('login')} className="header-login-link">
-          Acesso Restrito
-        </div>
-      )}
+      <div className="header-logo-container">
+        <img src={logoImage} alt="O Ninho Logo" className="header-logo-img" />
+      </div>
+      <div className="header-right">
+        {!user && (
+          <div onClick={() => navigate('login')} className="header-login-link">
+            Acesso Restrito
+          </div>
+        )}
+      </div>
     </header>
   );
 }
 
-// O resto do código do App.js não muda.
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -40,16 +45,19 @@ function App() {
     const auth = getAuth(app);
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
-      if (view !== 'book' && view !== 'login') {
+      if (view !== 'book') {
         if (currentUser) { setView('admin'); } 
         else { setView('home'); }
       }
       setLoading(false);
     });
     return () => unsubscribe();
-  }, [view]);
+  }, []); 
 
-  const handleLogout = () => { signOut(getAuth(app)); };
+  const handleLogout = () => {
+    const auth = getAuth(app);
+    signOut(auth);
+  };
   
   const navigate = (destination, bookCategory = null) => {
     if (bookCategory) { setSelectedBook(bookCategory); }
@@ -60,26 +68,29 @@ function App() {
   
   const renderCurrentView = () => {
     switch (view) {
-      case 'login': return <Login />;
+      case 'login': return <Login navigate={navigate} />;
       case 'book': return <Book bookCategory={selectedBook} />; 
-      case 'admin': return user ? <AdminPanel onLogout={handleLogout} /> : <Login />;
+      case 'admin': return user ? <AdminPanel user={user} onLogout={handleLogout} /> : <Login navigate={navigate} />;
       default: return <HomePage navigate={navigate} />;
     }
   };
   
-  const appStyle = {
-    backgroundImage: `url(${backgroundImage})`
-  };
-
   const showHeader = view === 'home' || view === 'login';
   const showFooter = view === 'home' || view === 'book';
 
   return (
-    <div className="app-container" style={appStyle}>
+    <div className="app-container">
       {showHeader && <AppHeader navigate={navigate} user={user} />}
       <main className="main-content">
         {renderCurrentView()}
       </main>
+      
+      {showFooter && (
+        <div className="ad-area">
+          Espaço para Adsense (728x90)
+        </div>
+      )}
+      
       {showFooter && <Footer />}
     </div>
   );
