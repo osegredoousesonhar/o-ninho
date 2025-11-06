@@ -1,5 +1,5 @@
 // ===================================================================
-// ARQUIVO COMPLETO E FINAL PARA: src/App.js
+// ARQUIVO COMPLETO E FINAL PARA: src/App.js (INTEGRADO)
 // ===================================================================
 
 import React, { useState, useEffect } from 'react';
@@ -7,15 +7,19 @@ import { getAuth, onAuthStateChanged, signOut } from "firebase/auth";
 import app from './firebaseConfig.js';
 import './App.css'; 
 
-import logoImage from './assets/logo2.png'; // Usando o logo2 como solicitado
+import logoImage from './assets/logo2.png';
 
 import Login from './components/Login';
 import HomePage from './components/HomePage';
 import Book from './components/Book';
 import AdminPanel from './components/AdminPanel';
 import Footer from './components/Footer';
+// ===== MUDANÇA 1: Importamos nossa nova página de ferramentas =====
+import BirdToolsPage from './components/BirdToolsPage';
+// =================================================================
 
 function AppHeader({ navigate, user }) {
+  // ... (O seu componente AppHeader continua exatamente igual)
   return (
     <header className="app-header">
       <div className="header-left">
@@ -42,10 +46,11 @@ function App() {
   const [selectedBook, setSelectedBook] = useState(null); 
 
   useEffect(() => {
+    // ... (O seu useEffect continua exatamente igual)
     const auth = getAuth(app);
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
-      if (view !== 'book') {
+      if (view !== 'book' && view !== 'tools') { // Adicionado 'tools' para não resetar a view
         if (currentUser) { setView('admin'); } 
         else { setView('home'); }
       }
@@ -55,11 +60,13 @@ function App() {
   }, []); 
 
   const handleLogout = () => {
+    // ... (Sua função handleLogout continua exatamente igual)
     const auth = getAuth(app);
     signOut(auth);
   };
   
   const navigate = (destination, bookCategory = null) => {
+    // ... (Sua função navigate continua exatamente igual)
     if (bookCategory) { setSelectedBook(bookCategory); }
     setView(destination);
   };
@@ -70,13 +77,18 @@ function App() {
     switch (view) {
       case 'login': return <Login navigate={navigate} />;
       case 'book': return <Book bookCategory={selectedBook} />; 
+      // ===== MUDANÇA 2: Adicionamos o 'case' para a nossa nova página =====
+      case 'tools': return <BirdToolsPage birdName={selectedBook} navigate={navigate} />;
+      // ===================================================================
       case 'admin': return user ? <AdminPanel user={user} onLogout={handleLogout} /> : <Login navigate={navigate} />;
       default: return <HomePage navigate={navigate} />;
     }
   };
   
   const showHeader = view === 'home' || view === 'login';
-  const showFooter = view === 'home' || view === 'book';
+  // ===== MUDANÇA 3: Adicionamos a view 'tools' para mostrar o footer nela também =====
+  const showFooter = view === 'home' || view === 'book' || view === 'tools';
+  // =================================================================================
 
   return (
     <div className="app-container">
